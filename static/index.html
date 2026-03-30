@@ -1,0 +1,1055 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Victorian Title Search</title>
+    <link
+      href="https://fonts.googleapis.com/css2?family=DM+Serif+Display:ital@0;1&family=DM+Sans:wght@300;400;500&display=swap"
+      rel="stylesheet"
+    />
+    <script src="https://js.stripe.com/v3/"></script>
+    <style>
+      *,
+      *::before,
+      *::after {
+        box-sizing: border-box;
+        margin: 0;
+        padding: 0;
+      }
+      :root {
+        --navy: #0f1f3d;
+        --navy-light: #1a3260;
+        --gold: #c9a84c;
+        --cream: #f8f5ef;
+        --text: #1a1a2e;
+        --muted: #6b7280;
+        --border: #e2d9c8;
+        --white: #ffffff;
+        --error: #991b1b;
+      }
+      body {
+        font-family: "DM Sans", sans-serif;
+        background: var(--cream);
+        color: var(--text);
+        min-height: 100vh;
+        display: flex;
+        flex-direction: column;
+      }
+      header {
+        background: var(--navy);
+        padding: 1.25rem 2rem;
+      }
+      .logo-text {
+        font-family: "DM Serif Display", serif;
+        color: var(--gold);
+        font-size: 1.4rem;
+      }
+      .logo-sub {
+        color: rgba(255, 255, 255, 0.5);
+        font-size: 0.75rem;
+        letter-spacing: 0.1em;
+        text-transform: uppercase;
+        margin-top: 2px;
+      }
+      .hero {
+        background: linear-gradient(
+          135deg,
+          var(--navy) 0%,
+          var(--navy-light) 100%
+        );
+        padding: 4rem 2rem 5rem;
+        text-align: center;
+      }
+      .hero h1 {
+        font-family: "DM Serif Display", serif;
+        font-size: clamp(2rem, 5vw, 3.2rem);
+        color: var(--white);
+        line-height: 1.15;
+        margin-bottom: 0.75rem;
+      }
+      .hero h1 em {
+        color: var(--gold);
+        font-style: italic;
+      }
+      .hero p {
+        color: rgba(255, 255, 255, 0.6);
+        font-size: 1rem;
+        font-weight: 300;
+        margin-bottom: 2.5rem;
+      }
+      .search-wrapper {
+        max-width: 620px;
+        margin: 0 auto;
+        position: relative;
+      }
+      .search-card {
+        background: var(--white);
+        border-radius: 16px;
+        padding: 0.5rem;
+        display: flex;
+        gap: 0.5rem;
+        box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+      }
+      .search-input {
+        flex: 1;
+        border: none;
+        outline: none;
+        padding: 1rem 1.25rem;
+        font-family: "DM Sans", sans-serif;
+        font-size: 0.95rem;
+        color: var(--text);
+        background: transparent;
+        border-radius: 12px;
+      }
+      .search-input::placeholder {
+        color: var(--muted);
+      }
+      .search-btn {
+        background: var(--navy);
+        color: var(--white);
+        border: none;
+        border-radius: 10px;
+        padding: 0.85rem 1.75rem;
+        font-family: "DM Sans", sans-serif;
+        font-size: 0.9rem;
+        font-weight: 500;
+        cursor: pointer;
+        transition: background 0.2s;
+        white-space: nowrap;
+      }
+      .search-btn:hover {
+        background: var(--navy-light);
+      }
+      .search-btn:disabled {
+        opacity: 0.6;
+        cursor: not-allowed;
+      }
+      .autocomplete-list {
+        position: absolute;
+        top: calc(100% + 6px);
+        left: 0;
+        right: 0;
+        background: var(--white);
+        border-radius: 12px;
+        box-shadow: 0 8px 30px rgba(0, 0, 0, 0.15);
+        overflow: hidden;
+        z-index: 100;
+        display: none;
+      }
+      .autocomplete-list.open {
+        display: block;
+      }
+      .autocomplete-item {
+        padding: 0.85rem 1.25rem;
+        cursor: pointer;
+        font-size: 0.88rem;
+        color: var(--text);
+        border-bottom: 1px solid var(--border);
+        transition: background 0.15s;
+        text-align: left;
+      }
+      .autocomplete-item:last-child {
+        border-bottom: none;
+      }
+      .autocomplete-item:hover {
+        background: var(--cream);
+      }
+      .autocomplete-item .suburb {
+        font-size: 0.75rem;
+        color: var(--muted);
+        margin-top: 2px;
+      }
+      .autocomplete-loading {
+        padding: 0.85rem 1.25rem;
+        font-size: 0.85rem;
+        color: var(--muted);
+        text-align: center;
+      }
+      .main {
+        flex: 1;
+        max-width: 720px;
+        margin: 0 auto;
+        width: 100%;
+        padding: 2.5rem 1.5rem;
+      }
+      .loading {
+        display: none;
+        text-align: center;
+        padding: 3rem 1rem;
+      }
+      .loading.active {
+        display: block;
+      }
+      .spinner {
+        width: 44px;
+        height: 44px;
+        border: 3px solid var(--border);
+        border-top-color: var(--navy);
+        border-radius: 50%;
+        animation: spin 0.8s linear infinite;
+        margin: 0 auto 1.25rem;
+      }
+      @keyframes spin {
+        to {
+          transform: rotate(360deg);
+        }
+      }
+      .loading-text {
+        color: var(--muted);
+        font-size: 0.9rem;
+        margin-bottom: 1rem;
+      }
+      .loading-steps {
+        display: flex;
+        flex-direction: column;
+        gap: 0.4rem;
+        align-items: center;
+      }
+      .loading-step {
+        font-size: 0.8rem;
+        color: var(--muted);
+        opacity: 0;
+        animation: fadeStep 0.5s forwards;
+      }
+      @keyframes fadeStep {
+        to {
+          opacity: 1;
+        }
+      }
+      .results {
+        display: none;
+      }
+      .results.active {
+        display: block;
+      }
+      .results-header {
+        margin-bottom: 1.5rem;
+        padding-bottom: 1rem;
+        border-bottom: 1px solid var(--border);
+      }
+      .results-header h2 {
+        font-family: "DM Serif Display", serif;
+        font-size: 1.5rem;
+        color: var(--navy);
+        margin-bottom: 0.25rem;
+      }
+      .results-address {
+        color: var(--muted);
+        font-size: 0.85rem;
+      }
+      .product-list {
+        display: flex;
+        flex-direction: column;
+        gap: 0.75rem;
+      }
+      .product-card {
+        background: var(--white);
+        border: 1px solid var(--border);
+        border-radius: 12px;
+        padding: 1.25rem 1.5rem;
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 1rem;
+        transition:
+          box-shadow 0.2s,
+          border-color 0.2s;
+        animation: slideIn 0.3s ease forwards;
+        opacity: 0;
+      }
+      @keyframes slideIn {
+        from {
+          opacity: 0;
+          transform: translateY(8px);
+        }
+        to {
+          opacity: 1;
+          transform: translateY(0);
+        }
+      }
+      .product-card:hover {
+        box-shadow: 0 4px 20px rgba(0, 0, 0, 0.08);
+        border-color: var(--gold);
+      }
+      .product-title {
+        font-weight: 500;
+        font-size: 0.95rem;
+        color: var(--navy);
+        margin-bottom: 0.2rem;
+      }
+      .product-registry {
+        font-size: 0.78rem;
+        color: var(--muted);
+        text-transform: uppercase;
+        letter-spacing: 0.06em;
+      }
+      .product-price {
+        font-family: "DM Serif Display", serif;
+        font-size: 1.3rem;
+        color: var(--navy);
+        white-space: nowrap;
+        margin-right: 1rem;
+      }
+      .buy-btn {
+        background: var(--gold);
+        color: var(--navy);
+        border: none;
+        border-radius: 8px;
+        padding: 0.6rem 1.2rem;
+        font-family: "DM Sans", sans-serif;
+        font-size: 0.85rem;
+        font-weight: 500;
+        cursor: pointer;
+        transition: background 0.2s;
+        white-space: nowrap;
+      }
+      .buy-btn:hover {
+        background: var(--gold-light, #e8c97a);
+      }
+
+      /* Modal */
+      .modal-overlay {
+        display: none;
+        position: fixed;
+        inset: 0;
+        background: rgba(0, 0, 0, 0.5);
+        z-index: 1000;
+        align-items: center;
+        justify-content: center;
+      }
+      .modal-overlay.open {
+        display: flex;
+      }
+      .modal {
+        background: var(--white);
+        border-radius: 16px;
+        padding: 2rem;
+        width: 100%;
+        max-width: 480px;
+        margin: 1rem;
+      }
+      .modal h3 {
+        font-family: "DM Serif Display", serif;
+        font-size: 1.4rem;
+        color: var(--navy);
+        margin-bottom: 0.25rem;
+      }
+      .modal-address {
+        font-size: 0.8rem;
+        color: var(--muted);
+        margin-bottom: 1.5rem;
+      }
+      .price-breakdown {
+        background: var(--cream);
+        border-radius: 10px;
+        padding: 1rem 1.25rem;
+        margin-bottom: 1.5rem;
+      }
+      .price-row {
+        display: flex;
+        justify-content: space-between;
+        font-size: 0.88rem;
+        color: var(--muted);
+        margin-bottom: 0.4rem;
+      }
+      .price-row.total {
+        font-weight: 500;
+        color: var(--navy);
+        font-size: 1rem;
+        margin-bottom: 0;
+        padding-top: 0.5rem;
+        border-top: 1px solid var(--border);
+        margin-top: 0.5rem;
+      }
+      .form-group {
+        margin-bottom: 1rem;
+      }
+      .form-group label {
+        display: block;
+        font-size: 0.82rem;
+        color: var(--muted);
+        margin-bottom: 0.35rem;
+      }
+      .form-group input {
+        width: 100%;
+        border: 1px solid var(--border);
+        border-radius: 8px;
+        padding: 0.7rem 0.9rem;
+        font-family: "DM Sans", sans-serif;
+        font-size: 0.9rem;
+        outline: none;
+        transition: border-color 0.2s;
+      }
+      .form-group input:focus {
+        border-color: var(--navy);
+      }
+      #card-element {
+        border: 1px solid var(--border);
+        border-radius: 8px;
+        padding: 0.75rem 0.9rem;
+        background: white;
+      }
+      .test-hint {
+        font-size: 0.75rem;
+        color: var(--muted);
+        margin-top: 0.4rem;
+      }
+      .modal-actions {
+        display: flex;
+        gap: 0.75rem;
+        margin-top: 1.5rem;
+      }
+      .pay-btn {
+        flex: 1;
+        background: var(--navy);
+        color: var(--white);
+        border: none;
+        border-radius: 10px;
+        padding: 0.9rem;
+        font-family: "DM Sans", sans-serif;
+        font-size: 0.95rem;
+        font-weight: 500;
+        cursor: pointer;
+        transition: background 0.2s;
+      }
+      .pay-btn:hover {
+        background: var(--navy-light);
+      }
+      .pay-btn:disabled {
+        opacity: 0.6;
+        cursor: not-allowed;
+      }
+      .cancel-btn {
+        background: transparent;
+        color: var(--muted);
+        border: 1px solid var(--border);
+        border-radius: 10px;
+        padding: 0.9rem 1.25rem;
+        font-family: "DM Sans", sans-serif;
+        font-size: 0.9rem;
+        cursor: pointer;
+      }
+      .modal-error {
+        color: var(--error);
+        font-size: 0.85rem;
+        margin-top: 0.5rem;
+        display: none;
+      }
+      .modal-error.show {
+        display: block;
+      }
+
+      /* Success */
+      .success-modal {
+        display: none;
+        position: fixed;
+        inset: 0;
+        background: rgba(0, 0, 0, 0.5);
+        z-index: 1001;
+        align-items: center;
+        justify-content: center;
+      }
+      .success-modal.open {
+        display: flex;
+      }
+      .success-box {
+        background: var(--white);
+        border-radius: 16px;
+        padding: 2.5rem;
+        text-align: center;
+        max-width: 400px;
+        margin: 1rem;
+      }
+      .success-icon {
+        font-size: 3rem;
+        margin-bottom: 1rem;
+      }
+      .success-box h3 {
+        font-family: "DM Serif Display", serif;
+        font-size: 1.5rem;
+        color: var(--navy);
+        margin-bottom: 0.5rem;
+      }
+      .success-box p {
+        color: var(--muted);
+        font-size: 0.9rem;
+        line-height: 1.6;
+      }
+      .success-close {
+        margin-top: 1.5rem;
+        background: var(--navy);
+        color: var(--white);
+        border: none;
+        border-radius: 10px;
+        padding: 0.8rem 2rem;
+        font-family: "DM Sans", sans-serif;
+        cursor: pointer;
+      }
+
+      .error-box {
+        display: none;
+        background: #fef2f2;
+        border: 1px solid #fecaca;
+        border-radius: 12px;
+        padding: 1.25rem 1.5rem;
+        color: var(--error);
+        font-size: 0.9rem;
+      }
+      .error-box.active {
+        display: block;
+      }
+      footer {
+        text-align: center;
+        padding: 1.5rem;
+        color: var(--muted);
+        font-size: 0.75rem;
+        border-top: 1px solid var(--border);
+      }
+    </style>
+  </head>
+  <body>
+    <header>
+      <div class="logo-text">Victorian Title Search</div>
+      <div class="logo-sub">Land Certificate Lookup</div>
+    </header>
+
+    <div class="hero">
+      <h1>Check <em>certificates</em><br />for any Victorian property</h1>
+      <p>Enter an address to see available land title products and prices</p>
+      <div class="search-wrapper">
+        <div class="search-card">
+          <input
+            type="text"
+            class="search-input"
+            id="addressInput"
+            placeholder="e.g. 12 Kanowna Street Hampton"
+            autocomplete="off"
+          />
+          <button class="search-btn" id="searchBtn" onclick="runSearch()">
+            <span id="btnText">Search</span>
+          </button>
+        </div>
+        <div class="autocomplete-list" id="autocompleteList"></div>
+      </div>
+    </div>
+
+    <main class="main">
+      <div class="loading" id="loading">
+        <div class="spinner"></div>
+        <div class="loading-text">
+          Searching LANDATA — this takes 15–20 seconds
+        </div>
+        <div class="loading-steps" id="loadingSteps"></div>
+      </div>
+      <div class="error-box" id="errorBox"></div>
+      <div class="results" id="results">
+        <div class="results-header">
+          <h2>Available Certificates</h2>
+          <div class="results-address" id="resultsAddress"></div>
+        </div>
+        <div class="product-list" id="productList"></div>
+      </div>
+    </main>
+
+    <!-- Payment Modal -->
+    <div class="modal-overlay" id="paymentModal">
+      <div class="modal">
+        <h3 id="modalTitle"></h3>
+        <div class="modal-address" id="modalAddress"></div>
+        <div class="price-breakdown" id="priceBreakdown"></div>
+        <div class="form-group">
+          <label>Your email (certificate will be sent here)</label>
+          <input
+            type="email"
+            id="customerEmail"
+            placeholder="you@example.com"
+          />
+        </div>
+        <div class="form-group">
+          <label
+            >Card details
+            <button
+              type="button"
+              onclick="fillTestCard()"
+              style="
+                margin-left: 0.5rem;
+                background: var(--gold);
+                color: var(--navy);
+                border: none;
+                border-radius: 5px;
+                padding: 2px 8px;
+                font-size: 0.72rem;
+                cursor: pointer;
+                font-family: &quot;DM Sans&quot;, sans-serif;
+                font-weight: 500;
+              "
+            >
+              Fill test card
+            </button></label
+          >
+          <div id="card-element"></div>
+          <div
+            id="test-card-fields"
+            style="
+              display: none;
+              margin-top: 0.5rem;
+              display: flex;
+              gap: 0.5rem;
+            "
+          >
+            <input
+              id="tc-number"
+              placeholder="Card number"
+              style="
+                flex: 2;
+                border: 1px solid var(--border);
+                border-radius: 8px;
+                padding: 0.6rem 0.8rem;
+                font-size: 0.88rem;
+                font-family: &quot;DM Sans&quot;, sans-serif;
+              "
+              value="4242 4242 4242 4242"
+              readonly
+            />
+            <input
+              id="tc-expiry"
+              placeholder="MM/YY"
+              style="
+                flex: 1;
+                border: 1px solid var(--border);
+                border-radius: 8px;
+                padding: 0.6rem 0.8rem;
+                font-size: 0.88rem;
+                font-family: &quot;DM Sans&quot;, sans-serif;
+              "
+              value="12/28"
+              readonly
+            />
+            <input
+              id="tc-cvc"
+              placeholder="CVC"
+              style="
+                flex: 1;
+                border: 1px solid var(--border);
+                border-radius: 8px;
+                padding: 0.6rem 0.8rem;
+                font-size: 0.88rem;
+                font-family: &quot;DM Sans&quot;, sans-serif;
+              "
+              value="123"
+              readonly
+            />
+          </div>
+          <div class="test-hint">Test mode — no real charges made</div>
+        </div>
+        <div class="modal-error" id="modalError"></div>
+        <div class="modal-actions">
+          <button class="cancel-btn" onclick="closeModal()">Cancel</button>
+          <button class="pay-btn" id="payBtn" onclick="submitPayment()">
+            Pay now
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Success Modal -->
+    <div class="success-modal" id="successModal">
+      <div class="success-box">
+        <div class="success-icon">✅</div>
+        <h3>Order Confirmed!</h3>
+        <p id="successMsg"></p>
+        <button class="success-close" onclick="closeSuccess()">Done</button>
+      </div>
+    </div>
+
+    <footer>
+      Data sourced from LANDATA® Victoria · Address suggestions via
+      OpenStreetMap
+    </footer>
+
+    <script>
+      const STRIPE_PK =
+        "pk_test_51MZl4REQl86c2xjFAFlpUe4noCD559NmvJBOB2M3sXmZCo9o7Jnesh1R3R3zsPmorxoslNxODP63sc160v7tofQt00PsfQo4TY";
+      const stripe = Stripe(STRIPE_PK);
+      const elements = stripe.elements();
+      const cardElement = elements.create("card", {
+        hidePostalCode: true,
+        style: {
+          base: {
+            fontFamily: "'DM Sans', sans-serif",
+            fontSize: "15px",
+            color: "#1a1a2e",
+          },
+        },
+      });
+
+      let currentAddress = "";
+      let currentProduct = null;
+      let currentClientSecret = "";
+      let selectedAddress = "";
+      let debounceTimer;
+
+      // Mount card element when modal opens
+      function mountCard() {
+        try {
+          cardElement.unmount();
+        } catch (e) {}
+        cardElement.mount("#card-element");
+      }
+
+      // --- Autocomplete ---
+      document
+        .getElementById("addressInput")
+        .addEventListener("input", function () {
+          const val = this.value.trim();
+          selectedAddress = "";
+          clearTimeout(debounceTimer);
+          if (val.length < 4) {
+            closeDropdown();
+            return;
+          }
+          debounceTimer = setTimeout(() => fetchSuggestions(val), 350);
+        });
+
+      document
+        .getElementById("addressInput")
+        .addEventListener("keydown", function (e) {
+          if (e.key === "Enter") {
+            closeDropdown();
+            runSearch();
+          }
+          if (e.key === "Escape") closeDropdown();
+        });
+
+      async function fetchSuggestions(query) {
+        const list = document.getElementById("autocompleteList");
+        list.innerHTML = '<div class="autocomplete-loading">Searching...</div>';
+        list.classList.add("open");
+        try {
+          const url = `https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(query + ", Victoria, Australia")}&format=json&addressdetails=1&limit=6&countrycodes=au`;
+          const res = await fetch(url, {
+            headers: { "Accept-Language": "en-AU" },
+          });
+          const data = await res.json();
+          const vic = data.filter(
+            (r) =>
+              r.address?.state === "Victoria" || r.address?.state === "VIC",
+          );
+          if (vic.length === 0) {
+            list.innerHTML =
+              '<div class="autocomplete-loading">No Victorian addresses found</div>';
+            return;
+          }
+          list.innerHTML = "";
+          vic.forEach((item) => {
+            const div = document.createElement("div");
+            div.className = "autocomplete-item";
+            const a = item.address;
+            const number = a.house_number || "";
+            const road = a.road || "";
+            const suburb = a.suburb || a.city || a.town || a.village || "";
+            const postcode = a.postcode || "";
+            const clean = [number, road, suburb, postcode]
+              .filter(Boolean)
+              .join(" ");
+            div.innerHTML = `<div>${number} ${road}</div><div class="suburb">${suburb}${postcode ? " " + postcode : ""}, VIC</div>`;
+            div.addEventListener("click", () => {
+              selectedAddress = clean;
+              document.getElementById("addressInput").value = clean;
+              closeDropdown();
+            });
+            list.appendChild(div);
+          });
+        } catch (err) {
+          list.innerHTML =
+            '<div class="autocomplete-loading">Error fetching suggestions</div>';
+        }
+      }
+
+      function closeDropdown() {
+        const list = document.getElementById("autocompleteList");
+        list.classList.remove("open");
+        list.innerHTML = "";
+      }
+
+      document.addEventListener("click", function (e) {
+        if (!e.target.closest(".search-wrapper")) closeDropdown();
+      });
+
+      // --- Search ---
+      const steps = [
+        "🌐 Opening LANDATA...",
+        "⌨️ Typing address...",
+        "🔍 Selecting suggestion...",
+        "📋 Loading certificate list...",
+        "💰 Extracting prices...",
+      ];
+
+      function showLoadingSteps() {
+        const container = document.getElementById("loadingSteps");
+        container.innerHTML = "";
+        steps.forEach((step, i) => {
+          const el = document.createElement("div");
+          el.className = "loading-step";
+          el.textContent = step;
+          el.style.animationDelay = `${i * 3}s`;
+          container.appendChild(el);
+        });
+      }
+
+      function setState(state) {
+        document
+          .getElementById("loading")
+          .classList.toggle("active", state === "loading");
+        document
+          .getElementById("results")
+          .classList.toggle("active", state === "results");
+        document
+          .getElementById("errorBox")
+          .classList.toggle("active", state === "error");
+      }
+
+      async function runSearch() {
+        const address =
+          selectedAddress ||
+          document.getElementById("addressInput").value.trim();
+        if (!address) {
+          document.getElementById("addressInput").focus();
+          return;
+        }
+        currentAddress = address;
+
+        const btn = document.getElementById("searchBtn");
+        btn.disabled = true;
+        document.getElementById("btnText").textContent = "Searching...";
+        setState("loading");
+        showLoadingSteps();
+
+        try {
+          const res = await fetch("/search", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ address }),
+          });
+          const data = await res.json();
+
+          if (data.status === "error") {
+            document.getElementById("errorBox").textContent =
+              `Error: ${data.message}`;
+            setState("error");
+          } else if (data.status === "multi_title") {
+            // Show title picker
+            currentAddress = data.address;
+            document.getElementById("resultsAddress").textContent =
+              `📍 ${data.address}`;
+            document.querySelector(".results-header h2").textContent =
+              "Select Title Record";
+            const list = document.getElementById("productList");
+            list.innerHTML = `<p style="color:var(--muted);font-size:0.85rem;margin-bottom:1rem">This address has ${data.titles.length} title records. Select the one you want:</p>`;
+            data.titles.forEach((t, i) => {
+              const card = document.createElement("div");
+              card.className = "product-card";
+              card.style.animationDelay = `${i * 0.08}s`;
+              card.innerHTML = `
+          <div>
+            <div class="product-title">${t.label}</div>
+            <div class="product-registry">Land Registry</div>
+          </div>
+          <button class="buy-btn" onclick="selectTitle('${t.btn_name}', '${t.label}', '${data.address}')">Select</button>
+        `;
+              list.appendChild(card);
+            });
+            setState("results");
+          } else {
+            document.getElementById("resultsAddress").textContent =
+              `📍 ${data.address}`;
+            const list = document.getElementById("productList");
+            list.innerHTML = "";
+            data.products.forEach((p, i) => {
+              const card = document.createElement("div");
+              card.className = "product-card";
+              card.style.animationDelay = `${i * 0.08}s`;
+              // Add $3 service fee to displayed price
+              const basePrice = parseFloat(p.price.replace("A$", "").trim());
+              const ourPrice = (basePrice + 3).toFixed(2);
+              card.innerHTML = `
+          <div>
+            <div class="product-title">${p.title}</div>
+            <div class="product-registry">${p.registry}</div>
+          </div>
+          <div style="display:flex;align-items:center;gap:0.5rem">
+            <div class="product-price">A$ ${ourPrice}</div>
+            <button class="buy-btn" onclick="openPayment('${p.title}', '${p.price}', '${ourPrice}')">Buy</button>
+          </div>
+        `;
+              list.appendChild(card);
+            });
+            setState("results");
+          }
+        } catch (err) {
+          document.getElementById("errorBox").textContent =
+            `Connection error: ${err.message}`;
+          setState("error");
+        } finally {
+          btn.disabled = false;
+          document.getElementById("btnText").textContent = "Search";
+        }
+      }
+
+      async function selectTitle(btnName, label, address) {
+        currentAddress = address;
+        const btn = document.getElementById("searchBtn");
+        btn.disabled = true;
+        document.getElementById("btnText").textContent = "Loading...";
+        setState("loading");
+        showLoadingSteps();
+
+        try {
+          const res = await fetch("/search-title", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ address, btn_name: btnName, label }),
+          });
+          const data = await res.json();
+          if (data.status === "error") {
+            document.getElementById("errorBox").textContent =
+              `Error: ${data.message}`;
+            setState("error");
+          } else {
+            document.getElementById("resultsAddress").textContent =
+              `📍 ${address} — ${label}`;
+            document.querySelector(".results-header h2").textContent =
+              "Available Certificates";
+            const list = document.getElementById("productList");
+            list.innerHTML = "";
+            data.products.forEach((p, i) => {
+              const card = document.createElement("div");
+              card.className = "product-card";
+              card.style.animationDelay = `${i * 0.08}s`;
+              const basePrice =
+                parseFloat((p.price || "0").replace("A$", "").trim()) || 0;
+              const ourPrice = (basePrice + 3).toFixed(2);
+              card.innerHTML = `
+          <div>
+            <div class="product-title">${p.title}</div>
+            <div class="product-registry">${p.registry}</div>
+          </div>
+          <div style="display:flex;align-items:center;gap:0.5rem">
+            <div class="product-price">A$ ${ourPrice}</div>
+            <button class="buy-btn" onclick="openPayment('${p.title}', '${p.price}', '${ourPrice}')">Buy</button>
+          </div>
+        `;
+              list.appendChild(card);
+            });
+            setState("results");
+          }
+        } catch (err) {
+          document.getElementById("errorBox").textContent =
+            `Error: ${err.message}`;
+          setState("error");
+        } finally {
+          btn.disabled = false;
+          document.getElementById("btnText").textContent = "Search";
+        }
+      }
+
+      async function openPayment(title, landataPrice, ourPrice) {
+        currentProduct = { title, landataPrice, ourPrice };
+        document.getElementById("modalTitle").textContent = title;
+        document.getElementById("modalAddress").textContent =
+          `📍 ${currentAddress}`;
+
+        const base = parseFloat(landataPrice.replace("A$", "").trim());
+        document.getElementById("priceBreakdown").innerHTML = `
+    <div class="price-row"><span>Certificate (LANDATA)</span><span>A$ ${base.toFixed(2)}</span></div>
+    <div class="price-row"><span>Service fee</span><span>A$ 3.00</span></div>
+    <div class="price-row total"><span>Total</span><span>A$ ${ourPrice}</span></div>
+  `;
+
+        // Get payment intent from backend
+        const res = await fetch("/create-payment-intent", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            address: currentAddress,
+            product_title: title,
+            price: landataPrice,
+          }),
+        });
+        const data = await res.json();
+        currentClientSecret = data.client_secret;
+
+        document.getElementById("paymentModal").classList.add("open");
+        setTimeout(mountCard, 100);
+      }
+
+      function closeModal() {
+        document.getElementById("paymentModal").classList.remove("open");
+        document.getElementById("modalError").classList.remove("show");
+        document.getElementById("customerEmail").value = "";
+      }
+
+      async function submitPayment() {
+        const email = document.getElementById("customerEmail").value.trim();
+        if (!email) {
+          showModalError("Please enter your email address");
+          return;
+        }
+
+        const btn = document.getElementById("payBtn");
+        btn.disabled = true;
+        btn.textContent = "Processing...";
+
+        const { paymentIntent, error } = await stripe.confirmCardPayment(
+          currentClientSecret,
+          {
+            payment_method: { card: cardElement, billing_details: { email } },
+          },
+        );
+
+        if (error) {
+          showModalError(error.message);
+          btn.disabled = false;
+          btn.textContent = "Pay now";
+          return;
+        }
+
+        // Confirm with backend
+        await fetch("/confirm-order", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ payment_intent_id: paymentIntent.id, email }),
+        });
+
+        closeModal();
+        document.getElementById("successMsg").textContent =
+          `Your ${currentProduct.title} for ${currentAddress} will be emailed to ${email} within a few minutes.`;
+        document.getElementById("successModal").classList.add("open");
+      }
+
+      function fillTestCard() {
+        // Show the readonly test card fields as a reference
+        const fields = document.getElementById("test-card-fields");
+        fields.style.display = "flex";
+        // Also try to programmatically fill Stripe element
+        cardElement.update({});
+        // Show a hint
+        document.getElementById("modalError").textContent =
+          "👆 Type these details into the card field above: 4242 4242 4242 4242 | 12/28 | 123";
+        document.getElementById("modalError").classList.add("show");
+        document.getElementById("modalError").style.color = "#166534";
+      }
+
+      function showModalError(msg) {
+        const el = document.getElementById("modalError");
+        el.textContent = msg;
+        el.classList.add("show");
+      }
+
+      function closeSuccess() {
+        document.getElementById("successModal").classList.remove("open");
+      }
+    </script>
+  </body>
+</html>
