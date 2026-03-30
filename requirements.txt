@@ -1,2 +1,4 @@
 flask
+stripe
 camoufox
+python-dotenv
