@@ -1,6 +1,7 @@
 import sys
 import io
 import os
+
 sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding="utf-8")
 from flask import Flask, request, jsonify, send_from_directory
 from camoufox.sync_api import Camoufox
@@ -10,26 +11,28 @@ import email
 import re
 import time
 import random
+
 try:
     from dotenv import load_dotenv
+
     load_dotenv()
 except ImportError:
     pass
 
-app = Flask(__name__, static_folder='static')
+app = Flask(__name__, static_folder="static")
 
-stripe.api_key = os.environ.get('STRIPE_SECRET_KEY', '')
+stripe.api_key = os.environ.get("STRIPE_SECRET_KEY", "")
 
 # Bot email config
-BOT_EMAIL = os.environ.get('BOT_EMAIL', 'townplanning917@gmail.com')
-BOT_APP_PASSWORD = os.environ.get('BOT_APP_PASSWORD', '')
+BOT_EMAIL = os.environ.get("BOT_EMAIL", "townplanning917@gmail.com")
+BOT_APP_PASSWORD = os.environ.get("BOT_APP_PASSWORD", "")
 
 # In-memory order store
 orders = {}
 
 
 def human_type(page, selector, text):
-    page.fill(selector, '')
+    page.fill(selector, "")
     time.sleep(0.3)
     page.click(selector)
     time.sleep(0.8)
@@ -55,29 +58,31 @@ def fetch_verification_code(timeout=60):
 
     while time.time() < deadline:
         try:
-            mail = imaplib.IMAP4_SSL('imap.gmail.com')
+            mail = imaplib.IMAP4_SSL("imap.gmail.com")
             mail.login(BOT_EMAIL, BOT_APP_PASSWORD)
-            mail.select('inbox')
+            mail.select("inbox")
 
             # Search for recent emails
-            _, data = mail.search(None, 'UNSEEN')
+            _, data = mail.search(None, "UNSEEN")
             ids = data[0].split()
 
             for num in reversed(ids):
-                _, msg_data = mail.fetch(num, '(RFC822)')
+                _, msg_data = mail.fetch(num, "(RFC822)")
                 msg = email.message_from_bytes(msg_data[0][1])
 
                 # Get email body
-                body = ''
+                body = ""
                 if msg.is_multipart():
                     for part in msg.walk():
-                        if part.get_content_type() == 'text/plain':
-                            body += part.get_payload(decode=True).decode('utf-8', errors='ignore')
+                        if part.get_content_type() == "text/plain":
+                            body += part.get_payload(decode=True).decode(
+                                "utf-8", errors="ignore"
+                            )
                 else:
-                    body = msg.get_payload(decode=True).decode('utf-8', errors='ignore')
+                    body = msg.get_payload(decode=True).decode("utf-8", errors="ignore")
 
                 # Look for 6-digit code
-                match = re.search(r'\b(\d{6})\b', body)
+                match = re.search(r"\b(\d{6})\b", body)
                 if match:
                     code = match.group(1)
                     print(f"[OK] Found verification code: {code}")
@@ -113,8 +118,13 @@ def landata_production_search(address):
             time.sleep(2)
 
             target_selector = 'input[type="text"]'
-            for selector in ['input[placeholder*="address"]', 'input[placeholder*="Address"]',
-                             'input[placeholder*="property"]', 'input[type="search"]', 'input[type="text"]']:
+            for selector in [
+                'input[placeholder*="address"]',
+                'input[placeholder*="Address"]',
+                'input[placeholder*="property"]',
+                'input[type="search"]',
+                'input[type="text"]',
+            ]:
                 if page.locator(selector).count() > 0:
                     target_selector = selector
                     break
@@ -125,11 +135,17 @@ def landata_production_search(address):
                 f"""() => {{
                     const items = document.querySelectorAll('li, [role="option"], [class*="suggestion"], [class*="result"]');
                     return Array.from(items).some(el => el.offsetParent !== null && el.innerText.toUpperCase().includes('{keyword}'));
-                }}""", timeout=10000)
+                }}""",
+                timeout=10000,
+            )
 
-            suggestion = page.locator(
-                'li:visible, [role="option"]:visible, [class*="suggestion"]:visible, [class*="result"]:visible'
-            ).filter(has_text=keyword).first
+            suggestion = (
+                page.locator(
+                    'li:visible, [role="option"]:visible, [class*="suggestion"]:visible, [class*="result"]:visible'
+                )
+                .filter(has_text=keyword)
+                .first
+            )
             suggestion.hover()
             time.sleep(0.2)
             suggestion.click()
@@ -138,24 +154,37 @@ def landata_production_search(address):
             page.locator("button:has-text('Next')").click()
 
             # Wait for either /products or /multi (multi-title addresses)
-            page.wait_for_url(lambda url: "/products" in url or "/multi" in url, timeout=15000)
+            page.wait_for_url(
+                lambda url: "/products" in url or "/multi" in url, timeout=15000
+            )
             time.sleep(2)
 
             # Handle multi-title page
             if "/multi" in page.url:
                 print("[MULTI] Multi-title address — opening old portal...")
-                page.wait_for_selector("a:has-text('All Products'), button:has-text('All Products')", timeout=10000)
-                page.locator("a:has-text('All Products'), button:has-text('All Products')").first.click()
+                page.wait_for_selector(
+                    "a:has-text('All Products'), button:has-text('All Products')",
+                    timeout=10000,
+                )
+                page.locator(
+                    "a:has-text('All Products'), button:has-text('All Products')"
+                ).first.click()
                 page.wait_for_load_state("networkidle")
                 time.sleep(2)
                 print(f"[OK] Old portal loaded: {page.url}")
 
                 # Step 1: Click Street Address radio button
-                page.wait_for_selector("#ContentPlaceHolder1_IdentifierChoice_0", state="visible", timeout=15000)
+                page.wait_for_selector(
+                    "#ContentPlaceHolder1_IdentifierChoice_0",
+                    state="visible",
+                    timeout=15000,
+                )
                 time.sleep(1)
                 page.click("#ContentPlaceHolder1_IdentifierChoice_0")
                 time.sleep(2)
-                page.wait_for_selector("#ContentPlaceHolder1_StreetNumber", state="visible", timeout=15000)
+                page.wait_for_selector(
+                    "#ContentPlaceHolder1_StreetNumber", state="visible", timeout=15000
+                )
                 print("[OK] Street Address radio selected")
 
                 # Parse address parts
@@ -180,11 +209,14 @@ def landata_production_search(address):
                 time.sleep(2)
 
                 # Step 2: Extract titles from confirm property page
-                page.wait_for_selector("input[value='Confirm Property Details']", timeout=20000)
+                page.wait_for_selector(
+                    "input[value='Confirm Property Details']", timeout=20000
+                )
                 print("[OK] On confirm property page")
 
                 # Use exact input IDs: p1lotplan_lotsN and p1lotplan_plannumberN
-                titles_data = page.evaluate("""
+                titles_data = page.evaluate(
+                    """
                     () => {
                         const results = [];
                         let i = 1;
@@ -204,20 +236,24 @@ def landata_production_search(address):
                         results.forEach(r => r.btn_name = btnName);
                         return results;
                     }
-                """)
+                """
+                )
 
-                print(f"[OK] Found {len(titles_data)} titles: {[t['label'] for t in titles_data]}")
+                print(
+                    f"[OK] Found {len(titles_data)} titles: {[t['label'] for t in titles_data]}"
+                )
                 return {
                     "status": "multi_title",
                     "address": address,
                     "titles": titles_data,
-                    "message": "This address has multiple title records. Please select one."
+                    "message": "This address has multiple title records. Please select one.",
                 }
 
             page.wait_for_selector("text=Copy of Title", timeout=15000)
             time.sleep(1)
 
-            products = page.evaluate("""() => {
+            products = page.evaluate(
+                """() => {
                 const results = [];
                 const checkboxes = document.querySelectorAll('input[type="checkbox"]');
                 for (const cb of checkboxes) {
@@ -240,13 +276,14 @@ def landata_production_search(address):
                     results.push({ title, registry, price: priceMatch[0] });
                 }
                 return results;
-            }""")
+            }"""
+            )
 
             seen = set()
             clean = []
             for p in products:
-                if p['title'] not in seen:
-                    seen.add(p['title'])
+                if p["title"] not in seen:
+                    seen.add(p["title"])
                     clean.append(p)
 
             return {"status": "success", "address": address, "products": clean}
@@ -269,7 +306,11 @@ def landata_purchase(address, product_title, customer_email):
             time.sleep(3)
 
             target_selector = 'input[type="text"]'
-            for selector in ['input[placeholder*="address"]', 'input[placeholder*="Address"]', 'input[type="text"]']:
+            for selector in [
+                'input[placeholder*="address"]',
+                'input[placeholder*="Address"]',
+                'input[type="text"]',
+            ]:
                 if page.locator(selector).count() > 0:
                     target_selector = selector
                     break
@@ -282,11 +323,17 @@ def landata_purchase(address, product_title, customer_email):
                 f"""() => {{
                     const items = document.querySelectorAll('li, [role="option"], [class*="suggestion"], [class*="result"]');
                     return Array.from(items).some(el => el.offsetParent !== null && el.innerText.toUpperCase().includes('{keyword}'));
-                }}""", timeout=15000)
+                }}""",
+                timeout=15000,
+            )
 
-            suggestion = page.locator(
-                'li:visible, [role="option"]:visible, [class*="suggestion"]:visible, [class*="result"]:visible'
-            ).filter(has_text=keyword).first
+            suggestion = (
+                page.locator(
+                    'li:visible, [role="option"]:visible, [class*="suggestion"]:visible, [class*="result"]:visible'
+                )
+                .filter(has_text=keyword)
+                .first
+            )
             suggestion.hover()
             time.sleep(0.5)
             suggestion.click()
@@ -304,7 +351,7 @@ def landata_purchase(address, product_title, customer_email):
             checkboxes = page.locator('input[type="checkbox"]').all()
             for cb in checkboxes:
                 try:
-                    card = cb.locator('xpath=ancestor::*[position()<=8]').last
+                    card = cb.locator("xpath=ancestor::*[position()<=8]").last
                     if product_title.lower() in card.inner_text().lower():
                         cb.click()
                         print(f"[OK] Selected: {product_title}")
@@ -332,7 +379,9 @@ def landata_purchase(address, product_title, customer_email):
                     id_ = inp.get_attribute("id") or ""
                     type_ = inp.get_attribute("type") or ""
                     visible = inp.is_visible()
-                    print(f"  INPUT: type='{type_}' placeholder='{ph}' id='{id_}' visible={visible}")
+                    print(
+                        f"  INPUT: type='{type_}' placeholder='{ph}' id='{id_}' visible={visible}"
+                    )
                 except:
                     pass
 
@@ -365,7 +414,7 @@ def landata_purchase(address, product_title, customer_email):
             print("[WAIT] Waiting for Send Code to enable...")
             page.wait_for_function(
                 "() => { const btn = document.querySelector('button'); return btn && !btn.disabled; }",
-                timeout=15000
+                timeout=15000,
             )
             time.sleep(0.5)
             page.locator("button:has-text('Send Code')").click()
@@ -389,20 +438,23 @@ def landata_purchase(address, product_title, customer_email):
             time.sleep(3)
             print("[OK] Verified! Purchase complete.")
 
-            return {"status": "success", "message": f"Certificate purchased! Will be emailed to {customer_email} shortly."}
+            return {
+                "status": "success",
+                "message": f"Certificate purchased! Will be emailed to {customer_email} shortly.",
+            }
 
         except Exception as e:
             print(f"[WARN] Purchase error: {e}")
             return {"status": "error", "message": str(e)}
 
 
-@app.route('/search-title', methods=['POST'])
+@app.route("/search-title", methods=["POST"])
 def search_title():
     """Handle title selection for multi-title addresses via old portal"""
     data = request.get_json()
-    address = data.get('address', '').strip()
-    btn_name = data.get('btn_name', '')
-    label = data.get('label', '')
+    address = data.get("address", "").strip()
+    btn_name = data.get("btn_name", "")
+    label = data.get("label", "")
 
     short_address, keyword = parse_address(address)
 
@@ -412,20 +464,34 @@ def search_title():
 
         try:
             # Navigate to old portal directly
-            page.goto("https://www.landata.vic.gov.au/tpc_step_redirect.aspx", wait_until="networkidle")
+            page.goto(
+                "https://www.landata.vic.gov.au/tpc_step_redirect.aspx",
+                wait_until="networkidle",
+            )
             time.sleep(2)
 
             # Select Street Address radio
             page.click("#ContentPlaceHolder1_IdentifierChoice_0")
             time.sleep(2)
-            page.wait_for_selector("#ContentPlaceHolder1_StreetNumber", state="visible", timeout=10000)
+            page.wait_for_selector(
+                "#ContentPlaceHolder1_StreetNumber", state="visible", timeout=10000
+            )
 
             # Parse and fill address
             addr_parts = address.split()
             page.fill("#ContentPlaceHolder1_StreetNumber", addr_parts[0])
-            page.fill("#ContentPlaceHolder1_StreetName", addr_parts[1] if len(addr_parts) > 1 else "")
-            page.select_option("#ContentPlaceHolder1_StreetType", label=addr_parts[2] if len(addr_parts) > 2 else "Street")
-            page.fill("#ContentPlaceHolder1_Suburb", addr_parts[3] if len(addr_parts) > 3 else "")
+            page.fill(
+                "#ContentPlaceHolder1_StreetName",
+                addr_parts[1] if len(addr_parts) > 1 else "",
+            )
+            page.select_option(
+                "#ContentPlaceHolder1_StreetType",
+                label=addr_parts[2] if len(addr_parts) > 2 else "Street",
+            )
+            page.fill(
+                "#ContentPlaceHolder1_Suburb",
+                addr_parts[3] if len(addr_parts) > 3 else "",
+            )
             if len(addr_parts) > 4:
                 page.fill("#ContentPlaceHolder1_Postcode", addr_parts[4])
             time.sleep(1)
@@ -433,14 +499,18 @@ def search_title():
             time.sleep(2)
 
             # Click the specific confirm button by name
-            page.wait_for_selector("input[value='Confirm Property Details']", timeout=20000)
+            page.wait_for_selector(
+                "input[value='Confirm Property Details']", timeout=20000
+            )
             if btn_name:
                 btn = page.locator(f"input[name='{btn_name}']")
                 if btn.count() > 0:
                     btn.scroll_into_view_if_needed()
                     btn.click()
                 else:
-                    page.locator("input[value='Confirm Property Details']").first.click()
+                    page.locator(
+                        "input[value='Confirm Property Details']"
+                    ).first.click()
             else:
                 page.locator("input[value='Confirm Property Details']").first.click()
 
@@ -466,64 +536,83 @@ def search_title():
                     continue
                 # Look for price pattern
                 import re as re3
-                price_match = re3.search(r'\$\s*[\d.]+', text)
+
+                price_match = re3.search(r"\$\s*[\d.]+", text)
                 if price_match and len(text) < 200:
-                    lines = [l.strip() for l in text.split('\n') if l.strip()]
+                    lines = [l.strip() for l in text.split("\n") if l.strip()]
                     if lines:
-                        products.append({
-                            "title": lines[0],
-                            "registry": "Land Registry",
-                            "price": f"A$ {price_match.group(0).replace('$','').strip()}"
-                        })
+                        products.append(
+                            {
+                                "title": lines[0],
+                                "registry": "Land Registry",
+                                "price": f"A$ {price_match.group(0).replace('$','').strip()}",
+                            }
+                        )
 
             if not products:
                 # Fallback — return generic products with standard prices
                 products = [
-                    {"title": "Copy of Title", "registry": "Land Registry", "price": "A$ 8.10"},
-                    {"title": "Copy of Plan", "registry": "Land Registry", "price": "A$ 7.70"},
+                    {
+                        "title": "Copy of Title",
+                        "registry": "Land Registry",
+                        "price": "A$ 8.10",
+                    },
+                    {
+                        "title": "Copy of Plan",
+                        "registry": "Land Registry",
+                        "price": "A$ 7.70",
+                    },
                 ]
 
-            return jsonify({"status": "success", "address": address, "label": label, "products": products})
+            return jsonify(
+                {
+                    "status": "success",
+                    "address": address,
+                    "label": label,
+                    "products": products,
+                }
+            )
 
         except Exception as e:
             return jsonify({"status": "error", "message": str(e)})
 
 
-
-@app.route('/')
+@app.route("/")
 def index():
     from flask import render_template_string
-    with open(os.path.join(app.static_folder, 'index.html'), 'r') as f:
+
+    with open(os.path.join(app.static_folder, "index.html"), "r") as f:
         html = f.read()
     # Inject Stripe publishable key
-    pk = os.environ.get('STRIPE_PUBLISHABLE_KEY', '')
+    pk = os.environ.get("STRIPE_PUBLISHABLE_KEY", "")
     html = html.replace(
-        "const STRIPE_PK = document.querySelector('meta[name="stripe-pk"]')?.content || '';",
-        f"const STRIPE_PK = '{pk}';"
+        "const STRIPE_PK = document.querySelector('meta[name=\"stripe-pk\"]')?.content || '';",
+        f"const STRIPE_PK = '{pk}';",
     )
     from flask import Response
-    return Response(html, mimetype='text/html')
+
+    return Response(html, mimetype="text/html")
 
 
-@app.route('/search', methods=['POST'])
+@app.route("/search", methods=["POST"])
 def search():
     data = request.get_json()
-    address = data.get('address', '').strip()
+    address = data.get("address", "").strip()
     if not address:
         return jsonify({"status": "error", "message": "No address provided"}), 400
     result = landata_production_search(address)
     return jsonify(result)
 
 
-@app.route('/create-payment-intent', methods=['POST'])
+@app.route("/create-payment-intent", methods=["POST"])
 def create_payment_intent():
     data = request.get_json()
-    address = data.get('address', '')
-    product_title = data.get('product_title', '')
-    price_str = data.get('price', '')
+    address = data.get("address", "")
+    product_title = data.get("product_title", "")
+    price_str = data.get("price", "")
 
     try:
-        price_float = float(price_str.replace('A$', '').replace(',', '').strip())
+        price_float = float(price_str.replace("A$", "").replace(",", "").strip())
         margin = 3.00
         total = price_float + margin
         amount_cents = int(round(total * 100))
@@ -532,52 +621,62 @@ def create_payment_intent():
 
     intent = stripe.PaymentIntent.create(
         amount=amount_cents,
-        currency='aud',
-        metadata={'address': address, 'product': product_title, 'landata_price': price_str}
+        currency="aud",
+        metadata={
+            "address": address,
+            "product": product_title,
+            "landata_price": price_str,
+        },
     )
 
     orders[intent.id] = {
-        'address': address,
-        'product': product_title,
-        'status': 'pending',
-        'landata_price': price_str,
-        'total': f"A$ {total:.2f}"
+        "address": address,
+        "product": product_title,
+        "status": "pending",
+        "landata_price": price_str,
+        "total": f"A$ {total:.2f}",
     }
 
-    return jsonify({
-        'client_secret': intent.client_secret,
-        'total': f"A$ {total:.2f}",
-        'breakdown': {
-            'certificate': f"A$ {price_float:.2f}",
-            'service_fee': f"A$ {margin:.2f}",
-            'total': f"A$ {total:.2f}"
+    return jsonify(
+        {
+            "client_secret": intent.client_secret,
+            "total": f"A$ {total:.2f}",
+            "breakdown": {
+                "certificate": f"A$ {price_float:.2f}",
+                "service_fee": f"A$ {margin:.2f}",
+                "total": f"A$ {total:.2f}",
+            },
         }
-    })
+    )
 
 
-@app.route('/confirm-order', methods=['POST'])
+@app.route("/confirm-order", methods=["POST"])
 def confirm_order():
     data = request.get_json()
-    payment_intent_id = data.get('payment_intent_id', '')
-    customer_email = data.get('email', '')
+    payment_intent_id = data.get("payment_intent_id", "")
+    customer_email = data.get("email", "")
 
     if payment_intent_id not in orders:
         return jsonify({"status": "error", "message": "Order not found"}), 404
 
     order = orders[payment_intent_id]
-    order['status'] = 'paid'
-    order['customer_email'] = customer_email
+    order["status"] = "paid"
+    order["customer_email"] = customer_email
 
     # Trigger LANDATA purchase in background
-    print(f"[PAY] Payment confirmed — purchasing {order['product']} for {order['address']}")
-    result = landata_purchase(order['address'], order['product'], customer_email)
-    order['purchase_result'] = result
+    print(
+        f"[PAY] Payment confirmed — purchasing {order['product']} for {order['address']}"
+    )
+    result = landata_purchase(order["address"], order["product"], customer_email)
+    order["purchase_result"] = result
 
-    return jsonify({
-        "status": "success",
-        "message": f"Order confirmed! Your {order['product']} for {order['address']} will be emailed to {customer_email} within a few minutes."
-    })
+    return jsonify(
+        {
+            "status": "success",
+            "message": f"Order confirmed! Your {order['product']} for {order['address']} will be emailed to {customer_email} within a few minutes.",
+        }
+    )
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     app.run(debug=True, port=5000)
