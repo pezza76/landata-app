@@ -581,7 +581,9 @@ def search_title():
 def index():
     from flask import render_template_string
 
-    with open(os.path.join(app.static_folder, "index.html"), "r") as f:
+    with open(
+        os.path.join(app.static_folder, "index.html"), "r", encoding="utf-8"
+    ) as f:
         html = f.read()
     # Inject Stripe publishable key
     pk = os.environ.get("STRIPE_PUBLISHABLE_KEY", "")
