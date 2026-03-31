@@ -1,0 +1,8 @@
+[phases.setup]
+nixPkgs = ["firefox", "geckodriver", "xvfb-run"]
+
+[phases.build]
+cmds = ["pip install -r requirements.txt", "python -m camoufox fetch"]
+
+[start]
+cmd = "xvfb-run python app.py"
